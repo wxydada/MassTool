@@ -1,7 +1,7 @@
 # MassTool
 The implementation for MassTool: A Multi-Task Search-Based Tool Retrieval Framework for Large Language Models
 
-## How to run the code
+## Quick Start
 1. Download PLMs from Huggingface and make a folder with the name PLMs
 - **ANCE**: The PLM and description is avaliable [here](https://huggingface.co/sentence-transformers/msmarco-roberta-base-ance-firstp).
 - **TAS-B**: The PLM and description is avaliable [here](https://huggingface.co/sentence-transformers/msmarco-distilbert-base-tas-b).
