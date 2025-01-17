@@ -12,26 +12,19 @@ import csv
 import torch
 import torch.optim as optim
 from utility import Datasets
-from models.AITM import COLT
-from models.COLT import COLT as COLT_origin
-from models.AITM_wo_att import COLT as COLT_no_att
-from models.AITM_wo_thr import COLT as COLT_no_thr
-from models.AITM_evaluate import COLT as COLT_evaluate
+from models.MassTool import MassTool
 
 def get_cmd():
     parser = argparse.ArgumentParser()
     parser.add_argument("-g", "--gpu", default="0", type=str, help="which gpu to use")
-    parser.add_argument("-d", "--dataset", default="ToolBenchG2", type=str, help="which dataset to use, options:ToolLens,ToolBench")
-    parser.add_argument("-m", "--model", default="new_AITM", type=str, help="which model to use, options: COLT")
+    parser.add_argument("-d", "--dataset", default="ToolLens", type=str, help="which dataset to use, options:ToolLens,ToolBench")
+    parser.add_argument("-m", "--model", default="MassTool", type=str, help="which model to use, options: MassTool")
     parser.add_argument("-i", "--info", default="", type=str, help="any auxilary info that will be appended to the log file name")
     parser.add_argument("-infer", "--infer", default="True", type=str, help="train or infer")
     parser.add_argument("-nei", "--nei", default="10", type=int, help="num of neighbours to use,max number is 30")
     parser.add_argument("-att", "--att", default="simple", type=str, help="none or simple or multihead")
     parser.add_argument("-origin", "--origin", default="True", type=str, help="have origin query embedding or not")
-    # parser.add_argument("-threshold", "--threshold", default="0.6", type=float, help="the threshold of dynamic attention")
     parser.add_argument("-agg", "--agg", default="gating", type=str, help="aggration method of info and query embedding")
-    #parser.add_argument("-q_enable", "--q_enable", default="True", type=str, help="enable query side attention")
-    #parser.add_argument("-t_enable", "--t_enable", default="True", type=str, help="enable tool side attention")
     args = parser.parse_args()
 
     return args
@@ -43,7 +36,7 @@ def main():
     paras = get_cmd().__dict__
     dataset_name = paras["dataset"]
 
-    assert paras["model"] in ["COLT","AITM","new_AITM","abl_AITM"], "Pls select models from: COLT"
+    assert paras["model"] in ["MassTool"], "Pls select models from: MassTool"
     
     # with open("datasets/{}/unseen_tool.txt".format(dataset_name), 'r') as f:
     #     unseen_tool = list(map(int,f.readline().split('\t')))
@@ -53,15 +46,9 @@ def main():
         conf = conf_1[dataset_name.split("_")[0]]
     else:
         conf = conf_1[dataset_name]
-    conf_g3 = conf_1["ToolBenchG3"]
-    conf_g3["dataset"] = "ToolBenchG3"
-    conf_g2 = conf_1["ToolBenchG2"]
-    conf_g2["dataset"] = "ToolBenchG2"
     conf["dataset"] = dataset_name
     conf["model"] = paras["model"]
     dataset = Datasets(conf)
-    # dataset_G3 = Datasets(conf_g3)
-    # dataset_G2 = Datasets(conf_g2)
     conf["infer"] = paras["infer"]
     conf["gpu"] = paras["gpu"]
     conf["info"] = paras["info"]
@@ -69,8 +56,6 @@ def main():
     conf['attention_method'] = paras["att"]
     conf['origin'] = paras["origin"]
     conf['agg'] = paras["agg"]
-    #conf['q_enable'] = paras['q_enable']
-    #conf['t_enable'] = paras['t_enable']
                                         
     conf["num_queries"] = dataset.num_queries
     conf["num_scenes"] = dataset.num_scenes
@@ -135,12 +120,11 @@ def main():
         setting = "_".join(settings)
         
         if conf["attention_method"] == "none":
-            log_path = log_path + "/" + setting + "_COLT_no_att"
+            log_path = log_path + "/" + setting + "_MassTool_no_att"
         elif conf["threshold"] == 0:
-            log_path = log_path + "/" + setting  + "_COLT_no_dynamic"
+            log_path = log_path + "/" + setting  + "_MassTool_no_dynamic"
         else:
-            #setting += "_q_"+ conf['q_enable'] + "_t_" + conf['t_enable'] + '_3'
-            log_path = log_path + "/" + setting  + "_COLT_attention_auto"
+            log_path = log_path + "/" + setting  + "_MassTool"
         if os.path.exists(log_path) and conf['infer'] != "True":
             continue
         run_path = run_path + "/" + setting
@@ -161,15 +145,13 @@ def main():
         test_list=sorted(test_list)
         
         
-        if conf['model'] == 'AITM' or conf['model'] == "new_AITM" or conf['model'] == "abl_AITM":
+        if conf['model'] == "MassTool":
             if conf["attention_method"] == "none":
-                model = COLT_no_att(conf, dataset.graphs,test_list).to(device)
+                model = MassTool_no_att(conf, dataset.graphs,test_list).to(device)
             elif conf["threshold"] == 0:
-                model = COLT_no_thr(conf, dataset.graphs,test_list).to(device)
-            # elif conf["infer"] == "True":
-            #     model = COLT_evaluate(conf, dataset.graphs,test_list).to(device)
+                model = MassTool_no_thr(conf, dataset.graphs,test_list).to(device)
             else:
-                model = COLT(conf, dataset.graphs,test_list).to(device)
+                model = MassTool(conf, dataset.graphs,test_list).to(device)
         else:
             raise ValueError("Unimplemented model %s" %(conf["model"]))
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -343,17 +325,6 @@ def get_metrics(metrics, grd, pred, topks,i):
         row_indice = torch.zeros_like(col_indice) + torch.arange(pred.shape[0], device=pred.device, dtype=torch.long).view(-1, 1)
         grd = grd.to(pred.device)
         is_hit = grd[row_indice.view(-1), col_indice.view(-1)].view(-1, topk)
-        # if i*256 <= 11701 and (i+1)*256 >= 11701 and topk == 5:
-        #     print("query 11701 prediction:{}".format(col_indice[11701-i*256]))
-        #     exit()
-        # if topk == 5:
-        #     a = grd.sum(dim=-1) - is_hit.sum(dim=-1)
-        #     b = (grd.sum(dim=-1) == 0)
-        #     a[b] = float('-inf')
-        #     indices = torch.nonzero(a >= 3).squeeze()
-        #     if indices.numel() != 0:
-        #         print(indices+i*grd.shape[0])
-        #         print(col_indice[indices])
         tmp["recall"][topk] = get_recall(pred, grd, is_hit, topk)
         tmp["ndcg"][topk] = get_ndcg(pred, grd, is_hit, topk)
         tmp["comp"][topk] = calculate_completeness(pred, grd, topk)
