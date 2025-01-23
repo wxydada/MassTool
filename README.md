@@ -1,6 +1,8 @@
 # MassTool
 The implementation for MassTool: A Multi-Task Search-Based Tool Retrieval Framework for Large Language Models
 
+ToolDet is a unified dataset, which we have stored in the respective paths of each individual dataset.
+
 ## Quick Start
 1. Download PLMs from Huggingface and make a folder with the name PLMs
 - **ANCE**: The PLM and description is avaliable [here](https://huggingface.co/sentence-transformers/msmarco-roberta-base-ance-firstp).
